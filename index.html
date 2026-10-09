@@ -69,6 +69,8 @@
   .results-head h2 { margin: 0; }
   .results-head .tools { display: flex; gap: 8px; flex-wrap: wrap; }
   .results-head input { width: 220px; }
+  .results-head select { width: auto; }
+  td.num { text-align: right; }
   .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
   table { width: 100%; border-collapse: collapse; font-size: .88rem; }
   th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
@@ -178,7 +180,18 @@
       <h2 id="resultsTitle">Résultats</h2>
       <div class="tools">
         <input type="text" id="filter" placeholder="Filtrer les résultats…">
+        <select id="levWindow" title="Période observée pour les augmentations de capital">
+          <option value="12">Levées : 12 mois</option>
+          <option value="24">Levées : 24 mois</option>
+          <option value="36" selected>Levées : 36 mois</option>
+          <option value="60">Levées : 5 ans</option>
+        </select>
+        <button type="button" id="enrichBtn">Enrichir : CA &amp; levées</button>
       </div>
+    </div>
+    <div class="hint" style="margin:-4px 0 12px">
+      L'enrichissement porte sur les lignes affichées. <strong>CA</strong> : derniers comptes publiés (API Recherche d'entreprises, data.gouv.fr), souvent absent quand l'entreprise a choisi la confidentialité.
+      <strong>Levées</strong> : augmentations de capital publiées au BODACC. C'est un indice, pas une preuve de levée de fonds : les montants et investisseurs ne sont pas publiés, et les grands groupes en font aussi pour l'actionnariat salarié.
     </div>
     <div class="table-wrap">
       <table>
@@ -189,6 +202,9 @@
             <th data-key="naf">Code NAF <span class="arrow"></span></th>
             <th data-key="commune">Commune <span class="arrow"></span></th>
             <th data-key="effOrder">Effectif <span class="arrow"></span></th>
+            <th data-key="ageSort">Âge <span class="arrow"></span></th>
+            <th data-key="caSort">CA <span class="arrow"></span></th>
+            <th data-key="levSort">Levées (BODACC) <span class="arrow"></span></th>
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
@@ -241,8 +257,12 @@
     siegeOnly: $("siegeOnly"), activeOnly: $("activeOnly"), maxResults: $("maxResults"),
     endpoint: $("endpoint"), searchBtn: $("searchBtn"), exportBtn: $("exportBtn"),
     msg: $("msg"), resultsPanel: $("resultsPanel"), resultsTitle: $("resultsTitle"),
-    tbody: $("tbody"), filter: $("filter"), queryPreview: $("queryPreview")
+    tbody: $("tbody"), filter: $("filter"), queryPreview: $("queryPreview"),
+    enrichBtn: $("enrichBtn"), levWindow: $("levWindow")
   };
+  const RECHERCHE_API = "https://recherche-entreprises.api.gouv.fr/search";
+  const BODACC_API = "https://bodacc-datadila.opendatasoft.com/api/explore/v2.1/catalog/datasets/annonces-commerciales/records";
+  let enriching = false, stopEnrich = false;
 
   let rows = [];
   let sortKey = null, sortDir = 1;
@@ -310,6 +330,24 @@
     throw new Error(`Département non reconnu : « ${raw} ».`);
   }
 
+  function ageInYears(iso) {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (isNaN(d)) return null;
+    return Math.max(0, Math.floor((Date.now() - d.getTime()) / (365.25 * 864e5)));
+  }
+
+  function fmtEur(n) {
+    if (n === null || n === undefined) return "";
+    const a = Math.abs(n), f = (v) => v.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
+    if (a >= 1e9) return `${f(n / 1e9)} Md€`;
+    if (a >= 1e6) return `${f(n / 1e6)} M€`;
+    if (a >= 1e3) return `${Math.round(n / 1e3).toLocaleString("fr-FR")} k€`;
+    return `${n.toLocaleString("fr-FR")} €`;
+  }
+
+  const fmtMonth = (iso) => iso ? iso.slice(5, 7) + "/" + iso.slice(0, 4) : "";
+
   function buildQuery() {
     const nafs = splitList(els.naf.value).map(normalizeNaf);
     const deps = new Set(splitList(els.deps.value).map(normalizeDep));
@@ -356,6 +394,8 @@
       effCode, effLabel: t.label, effOrder: t.order, effYear: effYear || "",
       categorie: ul.categorieEntreprise || "",
       creation: ul.dateCreationUniteLegale || e.dateCreationEtablissement || "",
+      age: ageInYears(ul.dateCreationUniteLegale || e.dateCreationEtablissement),
+      ca: null, caYear: "", rn: null, levN: null, levLast: "", enriched: false, enrichError: false,
       etat: per.etatAdministratifEtablissement || "",
       partiel: e.statutDiffusionEtablissement === "P" || ul.statutDiffusionUniteLegale === "P"
     };
@@ -459,11 +499,31 @@
   }
 
   // ---------- Rendu ----------
+  // Valeurs manquantes triées en dernier (en ordre décroissant) via -1
+  function sortValue(r, key) {
+    if (key === "ageSort") return r.age ?? -1;
+    if (key === "caSort") return r.ca ?? -1;
+    if (key === "levSort") return r.levN ?? -1;
+    return r[key];
+  }
+
+  function caCell(r) {
+    if (r.ca !== null) return `${fmtEur(r.ca)} <span class="sub">(${esc(r.caYear)})</span>`;
+    if (r.enrichError) return '<span class="sub">erreur</span>';
+    return r.enriched ? '<span class="sub">non publié</span>' : "";
+  }
+
+  function levCell(r) {
+    if (r.levN === null) return r.enrichError && r.enriched ? '<span class="sub">erreur</span>' : "";
+    if (r.levN === 0) return '<span class="sub">aucune</span>';
+    return `${r.levN} augm. de capital <span class="sub">dern. ${esc(fmtMonth(r.levLast))}</span>`;
+  }
+
   function visibleRows() {
     const f = els.filter.value.trim().toLowerCase();
     let list = f ? rows.filter((r) => `${r.name} ${r.enseigne} ${r.siren} ${r.naf} ${r.commune} ${r.cp}`.toLowerCase().includes(f)) : rows.slice();
     if (sortKey) list.sort((a, b) => {
-      const x = a[sortKey], y = b[sortKey];
+      const x = sortValue(a, sortKey), y = sortValue(b, sortKey);
       return (typeof x === "number" ? x - y : String(x).localeCompare(String(y), "fr")) * sortDir;
     });
     return list;
@@ -476,7 +536,7 @@
     document.querySelectorAll("th[data-key] .arrow").forEach((s) => {
       s.textContent = s.parentElement.dataset.key === sortKey ? (sortDir === 1 ? "▲" : "▼") : "";
     });
-    if (!list.length) { els.tbody.innerHTML = '<tr><td colspan="5" class="empty">Aucune ligne ne correspond au filtre.</td></tr>'; return; }
+    if (!list.length) { els.tbody.innerHTML = '<tr><td colspan="8" class="empty">Aucune ligne ne correspond au filtre.</td></tr>'; return; }
     els.tbody.innerHTML = list.map((r) => `
       <tr>
         <td class="name">${esc(r.name)}${r.partiel ? ' <span class="sub">· diffusion partielle</span>' : ""}${r.enseigne ? `<div class="sub">${esc(r.enseigne)}</div>` : ""}</td>
@@ -484,6 +544,9 @@
         <td>${esc(r.naf)}</td>
         <td>${esc(r.commune)}${r.cp ? ` <span class="sub">${esc(r.cp)}</span>` : ""}</td>
         <td>${esc(r.effLabel)}${r.effYear ? ` <span class="sub">(${esc(r.effYear)})</span>` : ""}</td>
+        <td class="num">${r.age !== null ? `${r.age} an${r.age > 1 ? "s" : ""}` : ""}</td>
+        <td class="num">${caCell(r)}</td>
+        <td>${levCell(r)}</td>
       </tr>`).join("");
   }
 
@@ -495,16 +558,114 @@
   }));
   els.filter.addEventListener("input", render);
 
+  // ---------- Enrichissement (CA, levées) ----------
+  let levWindowUsed = null;
+
+  // Comptes publiés : API Recherche d'entreprises (DINUM), ~7 requêtes/s max
+  async function fetchFinances(siren, attempt = 0) {
+    const res = await fetch(`${RECHERCHE_API}?q=${siren}&page=1&per_page=1&minimal=true&include=finances`);
+    if (res.status === 429 && attempt < 4) { await sleep(2000 * (attempt + 1)); return fetchFinances(siren, attempt + 1); }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const body = await res.json();
+    const hit = (body.results || []).find((x) => x.siren === siren);
+    const fin = hit && hit.finances;
+    if (!fin) return { ca: null, caYear: "", rn: null };
+    const year = Object.keys(fin).sort().pop();
+    return { ca: fin[year].ca ?? null, caYear: year, rn: fin[year].resultat_net ?? null };
+  }
+
+  // Augmentations de capital au BODACC, par lots de SIREN (une requête agrégée par lot)
+  async function fetchCapitalIncreases(sirens, sinceIso) {
+    const where = `(${sirens.map((s) => `registre like "${s}"`).join(" or ")}) and modificationsgenerales like "capital (augmentation)" and dateparution >= date'${sinceIso}'`;
+    const params = new URLSearchParams({ where, select: "registre,count(*) as n,max(dateparution) as derniere", group_by: "registre", limit: "100" });
+    const res = await fetch(`${BODACC_API}?${params}`);
+    if (!res.ok) throw new Error(`BODACC HTTP ${res.status}`);
+    const body = await res.json();
+    const out = new Map();
+    for (const r of body.results || []) {
+      const key = String(r.registre).replace(/\D/g, "");
+      if (key.length === 9) out.set(key, { n: r.n, last: r.derniere || "" });
+    }
+    return out;
+  }
+
+  async function enrich() {
+    if (enriching) { stopEnrich = true; return; }
+    const sirens = [...new Set(visibleRows().filter((r) => !r.enriched && r.siren).map((r) => r.siren))];
+    if (!sirens.length) { showMsg("info", "Toutes les lignes affichées sont déjà enrichies."); return; }
+    if (sirens.length > 300 && !confirm(`${sirens.length} entreprises à enrichir, soit environ ${Math.ceil(sirens.length / 5 / 60)} min. Continuer ?`)) return;
+
+    enriching = true; stopEnrich = false;
+    els.enrichBtn.textContent = "Arrêter l'enrichissement";
+    els.searchBtn.disabled = true; els.levWindow.disabled = true;
+    const months = parseInt(els.levWindow.value, 10);
+    const since = new Date(); since.setMonth(since.getMonth() - months);
+    const sinceIso = since.toISOString().slice(0, 10);
+    const bySiren = new Map();
+    rows.forEach((r) => { if (!bySiren.has(r.siren)) bySiren.set(r.siren, []); bySiren.get(r.siren).push(r); });
+
+    // 1. BODACC : rapide, par lots de 25
+    let levMap = new Map(), bodaccFailed = false;
+    try {
+      for (let i = 0; i < sirens.length && !stopEnrich; i += 25) {
+        showMsg("info", `<span class="spinner"></span>Levées (BODACC) : ${Math.min(i + 25, sirens.length)} / ${sirens.length}…`);
+        const part = await fetchCapitalIncreases(sirens.slice(i, i + 25), sinceIso);
+        part.forEach((v, k) => levMap.set(k, v));
+      }
+    } catch (_) { bodaccFailed = true; }
+    if (!bodaccFailed && !stopEnrich) levWindowUsed = months;
+
+    // 2. CA : 3 requêtes en parallèle, chacune espacée de 600 ms (≈ 5/s)
+    const queue = sirens.slice();
+    let done = 0, errors = 0;
+    const worker = async () => {
+      while (queue.length && !stopEnrich) {
+        const s = queue.shift(), t0 = Date.now();
+        let fin = null;
+        try { fin = await fetchFinances(s); } catch (_) { errors++; }
+        for (const r of bySiren.get(s) || []) {
+          r.enriched = true;
+          r.enrichError = !fin;
+          if (fin) Object.assign(r, fin);
+          if (!bodaccFailed) {
+            const lv = levMap.get(s);
+            r.levN = lv ? lv.n : 0; r.levLast = lv ? lv.last : "";
+          }
+        }
+        done++;
+        if (done % 20 === 0) render();
+        showMsg("info", `<span class="spinner"></span>Chiffres d'affaires : ${done} / ${sirens.length}…`);
+        await sleep(Math.max(0, 600 - (Date.now() - t0)));
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+
+    enriching = false;
+    els.enrichBtn.textContent = "Enrichir : CA & levées";
+    els.searchBtn.disabled = false; els.levWindow.disabled = false;
+    render();
+    const withCa = rows.filter((r) => r.ca !== null).length;
+    const withLev = rows.filter((r) => r.levN > 0).length;
+    let note = `${done} entreprise(s) enrichie(s)${stopEnrich ? " (interrompu)" : ""} : CA publié pour ${withCa}, augmentation de capital récente pour ${withLev}.`;
+    if (errors) note += ` ${errors} échec(s) côté CA, relancez pour réessayer.`;
+    if (bodaccFailed) note += " Le BODACC n'a pas répondu : colonne Levées non renseignée.";
+    showMsg(errors || bodaccFailed ? "warn" : "ok", note);
+    rows.forEach((r) => { if (r.enrichError) r.enriched = false; }); // permettre une relance sur les échecs
+  }
+
   // ---------- Export CSV ----------
   function exportCsv() {
     const list = visibleRows();
     if (!list.length) return;
     const header = ["Raison sociale", "Enseigne", "SIREN", "SIRET", "Code NAF", "Adresse", "Code postal", "Commune",
-      "Tranche effectif (code)", "Tranche effectif", "Année effectif", "Catégorie entreprise", "Date de création", "Fiche"];
+      "Tranche effectif (code)", "Tranche effectif", "Année effectif", "Catégorie entreprise", "Date de création", "Âge (ans)",
+      "CA (€)", "Année CA", "Résultat net (€)", `Augmentations de capital (${levWindowUsed ?? els.levWindow.value} mois)`, "Dernière augmentation", "Fiche"];
+    const lev = (r) => (r.levN === null ? "" : r.levN);
     const cell = (v) => { const s = String(v ?? ""); return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
     // SIREN/SIRET préfixés pour qu'Excel conserve les zéros de tête
     const lines = list.map((r) => [r.name, r.enseigne, `="${r.siren}"`, `="${r.siret}"`, r.naf, r.adresse, r.cp, r.commune,
-      r.effCode, r.effLabel, r.effYear, r.categorie, r.creation, `https://annuaire-entreprises.data.gouv.fr/entreprise/${r.siren}`].map(cell).join(";"));
+      r.effCode, r.effLabel, r.effYear, r.categorie, r.creation, r.age ?? "",
+      r.ca ?? "", r.caYear, r.rn ?? "", lev(r), r.levLast ? r.levLast.slice(0, 10) : "", `https://annuaire-entreprises.data.gouv.fr/entreprise/${r.siren}`].map(cell).join(";"));
     const csv = "﻿" + [header.map(cell).join(";"), ...lines].join("\r\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
@@ -516,6 +677,7 @@
 
   els.searchBtn.addEventListener("click", search);
   els.exportBtn.addEventListener("click", exportCsv);
+  els.enrichBtn.addEventListener("click", enrich);
   [els.naf, els.deps].forEach((i) => i.addEventListener("keydown", (e) => { if (e.key === "Enter") search(); }));
 })();
 </script>

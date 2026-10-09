@@ -10,6 +10,14 @@ Aucun serveur, aucune dépendance externe : le navigateur interroge directement 
 2. Renseignez la cible : codes NAF (`62.01Z`, `6201Z` ou préfixe `62`), départements et/ou région, tranches d'effectif.
 3. Cliquez sur **Trouver les leads**, filtrez/triez le tableau, puis **Exporter en CSV** (format Excel FR, séparateur `;`).
 
+## Enrichissement
+
+Le bouton **Enrichir : CA & levées** complète les lignes affichées, sans clé :
+
+- **Âge** : calculé depuis la date de création Sirene (immédiat).
+- **CA et résultat net** : derniers comptes publiés, via l'[API Recherche d'entreprises](https://recherche-entreprises.api.gouv.fr) (DINUM). Absents si l'entreprise a opté pour la confidentialité.
+- **Levées** : nombre d'augmentations de capital publiées au [BODACC](https://bodacc-datadila.opendatasoft.com) sur la période choisie. C'est un indice, pas une preuve : ni montant ni investisseurs.
+
 ## Confidentialité
 
 La clé API n'est jamais stockée dans ce dépôt. Elle reste dans le navigateur de l'utilisateur (option de mémorisation limitée à l'onglet) et n'est envoyée qu'à l'INSEE, via l'en-tête `X-INSEE-Api-Key-Integration`.
