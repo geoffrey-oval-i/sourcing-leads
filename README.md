@@ -20,7 +20,7 @@ Le bouton **Enrichir : CA & levées** complète les lignes affichées, sans clé
 
 ## Confidentialité
 
-La clé API n'est jamais stockée dans ce dépôt. Elle reste dans le navigateur de l'utilisateur (option de mémorisation limitée à l'onglet) et n'est envoyée qu'à l'INSEE, via l'en-tête `X-INSEE-Api-Key-Integration`.
+La clé API n'est jamais stockée dans ce dépôt. Elle est mémorisée uniquement dans le navigateur de chaque utilisateur (localStorage, effaçable en décochant l'option) et n'est envoyée qu'à l'INSEE, via l'en-tête `X-INSEE-Api-Key-Integration`.
 
 ## Lancer en local
 

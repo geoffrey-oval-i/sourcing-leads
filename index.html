@@ -103,9 +103,9 @@
       <button type="button" id="toggleKey" aria-label="Afficher la clé">Afficher</button>
     </div>
     <div class="inline">
-      <label><input type="checkbox" id="rememberKey"> Mémoriser pour cette session d'onglet uniquement</label>
+      <label><input type="checkbox" id="rememberKey" checked> Mémoriser la clé sur cet appareil (décochez pour l'effacer)</label>
     </div>
-    <div class="hint">La clé reste dans votre navigateur et n'est envoyée qu'à api.insee.fr (en-tête <code>X-INSEE-Api-Key-Integration</code>).</div>
+    <div class="hint">La clé est stockée uniquement dans ce navigateur (jamais sur GitHub) et n'est envoyée qu'à api.insee.fr (en-tête <code>X-INSEE-Api-Key-Integration</code>).</div>
   </section>
 
   <section class="panel">
@@ -284,13 +284,13 @@
   }));
 
   try {
-    const saved = sessionStorage.getItem("sireneKey");
+    const saved = localStorage.getItem("sireneKey");
     if (saved) { els.apiKey.value = saved; els.rememberKey.checked = true; }
   } catch (_) {}
   const persistKey = () => {
     try {
-      if (els.rememberKey.checked && els.apiKey.value.trim()) sessionStorage.setItem("sireneKey", els.apiKey.value.trim());
-      else sessionStorage.removeItem("sireneKey");
+      if (els.rememberKey.checked && els.apiKey.value.trim()) localStorage.setItem("sireneKey", els.apiKey.value.trim());
+      else localStorage.removeItem("sireneKey");
     } catch (_) {}
   };
   els.rememberKey.addEventListener("change", persistKey);
