@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sourcing de leads Sirene</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1c2430; --muted: #5d6878;
+    --border: #dde2ea; --accent: #1f4e8c; --accent-hover: #173d6e; --accent-soft: #e8eff8;
+    --danger: #b42318; --danger-soft: #fdecea; --ok: #1e7a46; --ok-soft: #e7f5ed;
+    --warn: #8a5a00; --warn-soft: #fff4dc; --row-alt: #fafbfc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12161c; --panel: #1a2029; --text: #e6e9ee; --muted: #9aa5b4;
+      --border: #2c3542; --accent: #6b9de0; --accent-hover: #8ab3ea; --accent-soft: #1f2b3b;
+      --danger: #f2877d; --danger-soft: #3a1f1d; --ok: #6fcf97; --ok-soft: #173025;
+      --warn: #f0c46b; --warn-soft: #362c16; --row-alt: #1d242e;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 16px 60px; }
+  header h1 { margin: 0 0 4px; font-size: 1.5rem; font-weight: 650; letter-spacing: -0.01em; }
+  header p { margin: 0 0 22px; color: var(--muted); }
+  .badge { display: inline-block; font-size: .72rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .05em; color: var(--accent); background: var(--accent-soft);
+    padding: 2px 8px; border-radius: 999px; margin-left: 8px; vertical-align: middle; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 20px; margin-bottom: 18px; }
+  .panel h2 { margin: 0 0 14px; font-size: 1rem; font-weight: 650; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px 20px; }
+  label.lbl { display: block; font-weight: 600; font-size: .88rem; margin-bottom: 5px; }
+  .hint { color: var(--muted); font-size: .8rem; margin-top: 4px; }
+  input[type=text], input[type=password], input[type=number], select {
+    width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: 7px;
+    background: var(--panel); color: var(--text); font: inherit;
+  }
+  input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .keyrow { display: flex; gap: 8px; }
+  .keyrow input { flex: 1; font-family: ui-monospace, Consolas, monospace; }
+  button { font: inherit; cursor: pointer; border-radius: 7px; padding: 9px 16px;
+    border: 1px solid var(--border); background: var(--panel); color: var(--text); }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.primary:hover { background: var(--accent-hover); }
+  @media (prefers-color-scheme: dark) { button.primary { color: #0e1620; } }
+  button:disabled { opacity: .55; cursor: not-allowed; }
+  .checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 12px; }
+  .checks label, .inline label { font-size: .88rem; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .inline { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 6px; }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .presets button { padding: 3px 10px; font-size: .78rem; }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 18px; }
+  details { margin-top: 14px; }
+  summary { cursor: pointer; color: var(--muted); font-size: .88rem; }
+  .msg { border-radius: 8px; padding: 11px 14px; margin-bottom: 18px; font-size: .92rem; display: none; }
+  .msg.show { display: block; }
+  .msg.error { background: var(--danger-soft); color: var(--danger); border: 1px solid currentColor; }
+  .msg.ok { background: var(--ok-soft); color: var(--ok); border: 1px solid currentColor; }
+  .msg.info { background: var(--accent-soft); color: var(--accent); border: 1px solid currentColor; }
+  .msg.warn { background: var(--warn-soft); color: var(--warn); border: 1px solid currentColor; }
+  .msg code { font-size: .82rem; word-break: break-all; }
+  .results-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .results-head h2 { margin: 0; }
+  .results-head .tools { display: flex; gap: 8px; flex-wrap: wrap; }
+  .results-head input { width: 220px; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td.name { white-space: normal; min-width: 220px; }
+  th { background: var(--accent-soft); font-weight: 650; position: sticky; top: 0; cursor: pointer; user-select: none; }
+  th .arrow { color: var(--muted); font-size: .75rem; }
+  tbody tr:nth-child(even) { background: var(--row-alt); }
+  td a { color: var(--accent); text-decoration: none; font-family: ui-monospace, Consolas, monospace; }
+  td a:hover { text-decoration: underline; }
+  .sub { color: var(--muted); font-size: .78rem; }
+  .empty { padding: 30px; text-align: center; color: var(--muted); }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor;
+    border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  footer { color: var(--muted); font-size: .8rem; margin-top: 24px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Sourcing de leads <span class="badge">Données souveraines · INSEE Sirene</span></h1>
+    <p>Interrogez directement le répertoire Sirene depuis votre navigateur. Aucun serveur intermédiaire, aucune dépendance externe.</p>
+  </header>
+
+  <section class="panel">
+    <h2>1. Accès à l'API</h2>
+    <label class="lbl" for="apiKey">Clé API INSEE Sirene</label>
+    <div class="keyrow">
+      <input type="password" id="apiKey" autocomplete="off" spellcheck="false" placeholder="Collez votre clé d'intégration">
+      <button type="button" id="toggleKey" aria-label="Afficher la clé">Afficher</button>
+    </div>
+    <div class="inline">
+      <label><input type="checkbox" id="rememberKey"> Mémoriser pour cette session d'onglet uniquement</label>
+    </div>
+    <div class="hint">La clé reste dans votre navigateur et n'est envoyée qu'à api.insee.fr (en-tête <code>X-INSEE-Api-Key-Integration</code>).</div>
+  </section>
+
+  <section class="panel">
+    <h2>2. Votre cible</h2>
+    <div class="grid">
+      <div>
+        <label class="lbl" for="naf">Code(s) NAF</label>
+        <input type="text" id="naf" placeholder="ex. 62.01Z, 6202A, 70.22">
+        <div class="hint">Séparés par des virgules. Code complet (62.01Z ou 6201Z) ou préfixe (62.0, 70) pour une famille.</div>
+      </div>
+      <div>
+        <label class="lbl" for="deps">Département(s)</label>
+        <input type="text" id="deps" placeholder="ex. 75, 92, 69, 2A, 974">
+        <div class="hint">Séparés par des virgules.</div>
+      </div>
+      <div>
+        <label class="lbl" for="region">ou Région</label>
+        <select id="region"><option value="">— Aucune —</option></select>
+        <div class="hint">Cumulée avec les départements saisis.</div>
+      </div>
+    </div>
+
+    <div style="margin-top:18px">
+      <label class="lbl">Tranche d'effectif salarié</label>
+      <div class="presets">
+        <button type="button" data-preset="tpe">TPE (0-9)</button>
+        <button type="button" data-preset="pme">PME (10-249)</button>
+        <button type="button" data-preset="eti">ETI (250-4999)</button>
+        <button type="button" data-preset="ge">Grandes (5000+)</button>
+        <button type="button" data-preset="none">Tout décocher</button>
+      </div>
+      <div class="checks" id="effectifs"></div>
+      <div class="inline">
+        <label><input type="radio" name="effScope" value="ul" checked> Effectif de l'entreprise</label>
+        <label><input type="radio" name="effScope" value="etab"> Effectif de l'établissement</label>
+      </div>
+      <div class="hint">Aucune case cochée = toutes tailles.</div>
+    </div>
+
+    <div class="inline" style="margin-top:16px">
+      <label><input type="checkbox" id="siegeOnly" checked> Sièges sociaux uniquement (1 ligne par entreprise)</label>
+      <label><input type="checkbox" id="activeOnly" checked> Établissements actifs uniquement</label>
+    </div>
+
+    <details>
+      <summary>Options avancées</summary>
+      <div class="grid" style="margin-top:12px">
+        <div>
+          <label class="lbl" for="maxResults">Nombre maximum de résultats</label>
+          <input type="number" id="maxResults" value="1000" min="1" max="20000" step="100">
+          <div class="hint">Pagination automatique par lots de 1 000 (quota INSEE : 30 requêtes/minute).</div>
+        </div>
+        <div>
+          <label class="lbl" for="endpoint">Point d'accès de l'API</label>
+          <input type="text" id="endpoint" value="https://api.insee.fr/api-sirene/3.11/siret">
+          <div class="hint">À modifier uniquement si l'INSEE change de version.</div>
+        </div>
+      </div>
+    </details>
+
+    <div class="actions">
+      <button type="button" class="primary" id="searchBtn">Trouver les leads</button>
+      <button type="button" id="exportBtn" disabled>Exporter en CSV</button>
+      <span class="sub" id="queryPreview"></span>
+    </div>
+  </section>
+
+  <div class="msg" id="msg" role="status"></div>
+
+  <section class="panel" id="resultsPanel" style="display:none">
+    <div class="results-head">
+      <h2 id="resultsTitle">Résultats</h2>
+      <div class="tools">
+        <input type="text" id="filter" placeholder="Filtrer les résultats…">
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th data-key="name">Raison sociale <span class="arrow"></span></th>
+            <th data-key="siren">SIREN <span class="arrow"></span></th>
+            <th data-key="naf">Code NAF <span class="arrow"></span></th>
+            <th data-key="commune">Commune <span class="arrow"></span></th>
+            <th data-key="effOrder">Effectif <span class="arrow"></span></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    Source : INSEE, répertoire Sirene (données publiques, Licence Ouverte). Les unités en diffusion partielle sont signalées.
+    Pensez au RGPD pour les entrepreneurs individuels (personnes physiques).
+  </footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const TRANCHES = [
+    ["NN", "Non renseigné", -1], ["00", "0 salarié", 0], ["01", "1 ou 2", 1], ["02", "3 à 5", 2],
+    ["03", "6 à 9", 3], ["11", "10 à 19", 4], ["12", "20 à 49", 5], ["21", "50 à 99", 6],
+    ["22", "100 à 199", 7], ["31", "200 à 249", 8], ["32", "250 à 499", 9], ["41", "500 à 999", 10],
+    ["42", "1 000 à 1 999", 11], ["51", "2 000 à 4 999", 12], ["52", "5 000 à 9 999", 13], ["53", "10 000 et +", 14]
+  ];
+  const TRANCHE_MAP = Object.fromEntries(TRANCHES.map(([c, l, o]) => [c, { label: l, order: o }]));
+  const PRESETS = {
+    tpe: ["00", "01", "02", "03"], pme: ["11", "12", "21", "22", "31"],
+    eti: ["32", "41", "42", "51"], ge: ["52", "53"], none: []
+  };
+  const REGIONS = {
+    "Auvergne-Rhône-Alpes": ["01","03","07","15","26","38","42","43","63","69","73","74"],
+    "Bourgogne-Franche-Comté": ["21","25","39","58","70","71","89","90"],
+    "Bretagne": ["22","29","35","56"],
+    "Centre-Val de Loire": ["18","28","36","37","41","45"],
+    "Corse": ["2A","2B"],
+    "Grand Est": ["08","10","51","52","54","55","57","67","68","88"],
+    "Hauts-de-France": ["02","59","60","62","80"],
+    "Île-de-France": ["75","77","78","91","92","93","94","95"],
+    "Normandie": ["14","27","50","61","76"],
+    "Nouvelle-Aquitaine": ["16","17","19","23","24","33","40","47","64","79","86","87"],
+    "Occitanie": ["09","11","12","30","31","32","34","46","48","65","66","81","82"],
+    "Pays de la Loire": ["44","49","53","72","85"],
+    "Provence-Alpes-Côte d'Azur": ["04","05","06","13","83","84"],
+    "Guadeloupe": ["971"], "Martinique": ["972"], "Guyane": ["973"], "La Réunion": ["974"], "Mayotte": ["976"]
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    apiKey: $("apiKey"), toggleKey: $("toggleKey"), rememberKey: $("rememberKey"),
+    naf: $("naf"), deps: $("deps"), region: $("region"), effectifs: $("effectifs"),
+    siegeOnly: $("siegeOnly"), activeOnly: $("activeOnly"), maxResults: $("maxResults"),
+    endpoint: $("endpoint"), searchBtn: $("searchBtn"), exportBtn: $("exportBtn"),
+    msg: $("msg"), resultsPanel: $("resultsPanel"), resultsTitle: $("resultsTitle"),
+    tbody: $("tbody"), filter: $("filter"), queryPreview: $("queryPreview")
+  };
+
+  let rows = [];
+  let sortKey = null, sortDir = 1;
+
+  // ---------- Init UI ----------
+  for (const name of Object.keys(REGIONS)) {
+    const o = document.createElement("option");
+    o.value = name; o.textContent = name;
+    els.region.appendChild(o);
+  }
+  for (const [code, label] of TRANCHES) {
+    const l = document.createElement("label");
+    l.innerHTML = `<input type="checkbox" value="${code}"> ${label}`;
+    els.effectifs.appendChild(l);
+  }
+  document.querySelectorAll("[data-preset]").forEach((b) => b.addEventListener("click", () => {
+    const set = new Set(PRESETS[b.dataset.preset]);
+    els.effectifs.querySelectorAll("input").forEach((i) => { i.checked = set.has(i.value); });
+  }));
+
+  try {
+    const saved = sessionStorage.getItem("sireneKey");
+    if (saved) { els.apiKey.value = saved; els.rememberKey.checked = true; }
+  } catch (_) {}
+  const persistKey = () => {
+    try {
+      if (els.rememberKey.checked && els.apiKey.value.trim()) sessionStorage.setItem("sireneKey", els.apiKey.value.trim());
+      else sessionStorage.removeItem("sireneKey");
+    } catch (_) {}
+  };
+  els.rememberKey.addEventListener("change", persistKey);
+  els.apiKey.addEventListener("input", persistKey);
+
+  els.toggleKey.addEventListener("click", () => {
+    const show = els.apiKey.type === "password";
+    els.apiKey.type = show ? "text" : "password";
+    els.toggleKey.textContent = show ? "Masquer" : "Afficher";
+  });
+
+  // ---------- Helpers ----------
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const splitList = (v) => v.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  function showMsg(type, html) {
+    els.msg.className = `msg show ${type}`;
+    els.msg.innerHTML = html;
+  }
+  function hideMsg() { els.msg.className = "msg"; }
+
+  function normalizeNaf(raw) {
+    const s = raw.toUpperCase().replace(/\s/g, "");
+    let m = s.match(/^(\d{2})\.?(\d{2})([A-Z])$/);
+    if (m) return { value: `${m[1]}.${m[2]}${m[3]}`, wildcard: false };
+    m = s.match(/^(\d{2})(?:\.?(\d{1,2}))?$/);
+    if (m) return { value: m[2] ? `${m[1]}.${m[2]}*` : `${m[1]}*`, wildcard: true };
+    throw new Error(`Code NAF non reconnu : « ${raw} ». Formats acceptés : 62.01Z, 6201Z, 62.01, 62.`);
+  }
+
+  function normalizeDep(raw) {
+    const s = raw.toUpperCase();
+    if (/^(2A|2B)$/.test(s)) return s;
+    if (/^97\d$/.test(s)) return s;
+    if (/^\d{1,2}$/.test(s)) return s.padStart(2, "0");
+    throw new Error(`Département non reconnu : « ${raw} ».`);
+  }
+
+  function buildQuery() {
+    const nafs = splitList(els.naf.value).map(normalizeNaf);
+    const deps = new Set(splitList(els.deps.value).map(normalizeDep));
+    if (els.region.value) REGIONS[els.region.value].forEach((d) => deps.add(d));
+    const tranches = [...els.effectifs.querySelectorAll("input:checked")].map((i) => i.value);
+    const scope = document.querySelector("input[name=effScope]:checked").value;
+
+    if (!nafs.length && !deps.size) throw new Error("Indiquez au moins un code NAF ou une zone géographique.");
+
+    const parts = [];
+    const periode = [];
+    if (nafs.length) periode.push("(" + nafs.map((n) => `activitePrincipaleEtablissement:${n.value}`).join(" OR ") + ")");
+    if (els.activeOnly.checked) periode.push("etatAdministratifEtablissement:A");
+    if (periode.length) parts.push(`periode(${periode.join(" AND ")})`);
+    if (deps.size) parts.push("(" + [...deps].map((d) => `codeCommuneEtablissement:${d}*`).join(" OR ") + ")");
+    if (tranches.length) {
+      const field = scope === "ul" ? "trancheEffectifsUniteLegale" : "trancheEffectifsEtablissement";
+      parts.push("(" + tranches.map((t) => `${field}:${t}`).join(" OR ") + ")");
+    }
+    if (els.siegeOnly.checked) parts.push("etablissementSiege:true");
+    return { q: parts.join(" AND "), scope };
+  }
+
+  function mapEtab(e, scope) {
+    const ul = e.uniteLegale || {};
+    const per = (e.periodesEtablissement && e.periodesEtablissement[0]) || {};
+    const adr = e.adresseEtablissement || {};
+    const personne = [ul.prenomUsuelUniteLegale || ul.prenom1UniteLegale, ul.nomUsageUniteLegale || ul.nomUniteLegale].filter(Boolean).join(" ");
+    let name = ul.denominationUniteLegale || ul.denominationUsuelle1UniteLegale || personne || "(non diffusé)";
+    if (ul.sigleUniteLegale) name += ` (${ul.sigleUniteLegale})`;
+    const enseigne = per.enseigne1Etablissement || per.denominationUsuelleEtablissement || "";
+    const effCode = (scope === "ul" ? ul.trancheEffectifsUniteLegale : e.trancheEffectifsEtablissement) || "NN";
+    const effYear = scope === "ul" ? ul.anneeEffectifsUniteLegale : e.anneeEffectifsEtablissement;
+    const t = TRANCHE_MAP[effCode] || { label: effCode, order: -1 };
+    const adresse = [adr.numeroVoieEtablissement, adr.indiceRepetitionEtablissement, adr.typeVoieEtablissement, adr.libelleVoieEtablissement]
+      .filter(Boolean).join(" ");
+    return {
+      name, enseigne,
+      siren: e.siren || "", siret: e.siret || "",
+      naf: per.activitePrincipaleEtablissement || ul.activitePrincipaleUniteLegale || "",
+      commune: adr.libelleCommuneEtablissement || "",
+      cp: adr.codePostalEtablissement || "",
+      adresse,
+      effCode, effLabel: t.label, effOrder: t.order, effYear: effYear || "",
+      categorie: ul.categorieEntreprise || "",
+      creation: ul.dateCreationUniteLegale || e.dateCreationEtablissement || "",
+      etat: per.etatAdministratifEtablissement || "",
+      partiel: e.statutDiffusionEtablissement === "P" || ul.statutDiffusionUniteLegale === "P"
+    };
+  }
+
+  // ---------- API ----------
+  async function fetchPage(url, key, attempt = 0) {
+    let res;
+    try {
+      res = await fetch(url, { headers: { "X-INSEE-Api-Key-Integration": key, "Accept": "application/json" } });
+    } catch (err) {
+      const e = new Error("NETWORK"); e.cause = err; throw e;
+    }
+    if (res.status === 429 && attempt < 3) {
+      const wait = (parseInt(res.headers.get("Retry-After"), 10) || 20) * 1000;
+      showMsg("warn", `<span class="spinner"></span>Quota INSEE atteint (30 requêtes/minute). Nouvelle tentative dans ${Math.round(wait / 1000)} s…`);
+      await sleep(wait);
+      return fetchPage(url, key, attempt + 1);
+    }
+    let body = null;
+    try { body = await res.json(); } catch (_) {}
+    return { status: res.status, body };
+  }
+
+  function apiErrorMessage(status, body) {
+    const detail = body && body.header && body.header.message ? ` <span class="sub">(INSEE : ${esc(body.header.message)})</span>` : "";
+    switch (status) {
+      case 401: case 403:
+        return "Clé API refusée : vérifiez qu'elle est complète, active, et que votre application est bien souscrite à l'API Sirene sur portail-api.insee.fr." + detail;
+      case 400:
+        return "Requête refusée par l'INSEE : un critère est probablement mal formé (code NAF, département…)." + detail;
+      case 429:
+        return "Quota de requêtes dépassé (30/minute). Patientez une minute puis relancez." + detail;
+      case 500: case 502: case 503: case 504:
+        return "Le service Sirene est momentanément indisponible. Réessayez dans quelques minutes." + detail;
+      default:
+        return `Erreur inattendue (HTTP ${status}).` + detail;
+    }
+  }
+
+  async function search() {
+    hideMsg();
+    const key = els.apiKey.value.trim();
+    if (!key) { showMsg("error", "Collez d'abord votre clé API INSEE Sirene."); els.apiKey.focus(); return; }
+
+    let built;
+    try { built = buildQuery(); } catch (err) { showMsg("error", esc(err.message)); return; }
+    els.queryPreview.textContent = "";
+
+    const max = Math.max(1, Math.min(20000, parseInt(els.maxResults.value, 10) || 1000));
+    const endpoint = els.endpoint.value.trim().replace(/\/+$/, "");
+    els.searchBtn.disabled = true; els.exportBtn.disabled = true;
+    els.searchBtn.innerHTML = '<span class="spinner"></span>Recherche…';
+
+    const collected = [];
+    let total = null, cursor = "*";
+    try {
+      while (collected.length < max) {
+        const nombre = Math.min(1000, max - collected.length);
+        const url = `${endpoint}?q=${encodeURIComponent(built.q)}&nombre=${nombre}&curseur=${encodeURIComponent(cursor)}`;
+        showMsg("info", `<span class="spinner"></span>Interrogation de Sirene… ${collected.length} établissement(s) récupéré(s)${total !== null ? " sur " + total.toLocaleString("fr-FR") : ""}.`);
+        const { status, body } = await fetchPage(url, key);
+
+        if (status === 404) break; // Sirene renvoie 404 quand aucun établissement ne correspond
+        if (status !== 200) { showMsg("error", apiErrorMessage(status, body)); return; }
+
+        const etabs = (body && body.etablissements) || [];
+        total = body && body.header ? body.header.total : total;
+        collected.push(...etabs);
+        const next = body && body.header && body.header.curseurSuivant;
+        if (!etabs.length || !next || next === cursor) break;
+        cursor = next;
+      }
+    } catch (err) {
+      if (err.message === "NETWORK") {
+        showMsg("error",
+          "Impossible de joindre api.insee.fr. Causes possibles : pas de connexion, pare-feu/proxy d'entreprise, ou blocage CORS du navigateur. " +
+          "Si le fichier est ouvert en double-clic (file://), servez-le en local, par ex. <code>python -m http.server</code> puis ouvrez <code>http://localhost:8000/</code>.");
+      } else {
+        showMsg("error", "Erreur : " + esc(err.message));
+      }
+      return;
+    } finally {
+      els.searchBtn.disabled = false;
+      els.searchBtn.textContent = "Trouver les leads";
+    }
+
+    rows = collected.map((e) => mapEtab(e, built.scope));
+    if (els.activeOnly.checked) rows = rows.filter((r) => !r.etat || r.etat === "A");
+    sortKey = null; els.filter.value = "";
+    render();
+
+    if (!rows.length) {
+      showMsg("warn", "Aucun résultat pour ces critères. Essayez d'élargir : préfixe NAF (ex. « 62 »), plus de départements, ou moins de tranches d'effectif.");
+      return;
+    }
+    els.exportBtn.disabled = false;
+    const more = total !== null && total > collected.length
+      ? ` ${total.toLocaleString("fr-FR")} correspondent au total : augmentez le maximum dans les options avancées pour tout récupérer.` : "";
+    showMsg("ok", `${rows.length.toLocaleString("fr-FR")} lead(s) trouvé(s).${more}`);
+  }
+
+  // ---------- Rendu ----------
+  function visibleRows() {
+    const f = els.filter.value.trim().toLowerCase();
+    let list = f ? rows.filter((r) => `${r.name} ${r.enseigne} ${r.siren} ${r.naf} ${r.commune} ${r.cp}`.toLowerCase().includes(f)) : rows.slice();
+    if (sortKey) list.sort((a, b) => {
+      const x = a[sortKey], y = b[sortKey];
+      return (typeof x === "number" ? x - y : String(x).localeCompare(String(y), "fr")) * sortDir;
+    });
+    return list;
+  }
+
+  function render() {
+    els.resultsPanel.style.display = rows.length ? "" : "none";
+    const list = visibleRows();
+    els.resultsTitle.textContent = `Résultats (${list.length.toLocaleString("fr-FR")}${list.length !== rows.length ? " / " + rows.length.toLocaleString("fr-FR") : ""})`;
+    document.querySelectorAll("th[data-key] .arrow").forEach((s) => {
+      s.textContent = s.parentElement.dataset.key === sortKey ? (sortDir === 1 ? "▲" : "▼") : "";
+    });
+    if (!list.length) { els.tbody.innerHTML = '<tr><td colspan="5" class="empty">Aucune ligne ne correspond au filtre.</td></tr>'; return; }
+    els.tbody.innerHTML = list.map((r) => `
+      <tr>
+        <td class="name">${esc(r.name)}${r.partiel ? ' <span class="sub">· diffusion partielle</span>' : ""}${r.enseigne ? `<div class="sub">${esc(r.enseigne)}</div>` : ""}</td>
+        <td><a href="https://annuaire-entreprises.data.gouv.fr/entreprise/${esc(r.siren)}" target="_blank" rel="noopener noreferrer" title="Voir la fiche sur l'Annuaire des Entreprises">${esc(r.siren.replace(/(\d{3})(?=\d)/g, "$1 "))}</a></td>
+        <td>${esc(r.naf)}</td>
+        <td>${esc(r.commune)}${r.cp ? ` <span class="sub">${esc(r.cp)}</span>` : ""}</td>
+        <td>${esc(r.effLabel)}${r.effYear ? ` <span class="sub">(${esc(r.effYear)})</span>` : ""}</td>
+      </tr>`).join("");
+  }
+
+  document.querySelectorAll("th[data-key]").forEach((th) => th.addEventListener("click", () => {
+    const k = th.dataset.key;
+    sortDir = sortKey === k ? -sortDir : 1;
+    sortKey = k;
+    render();
+  }));
+  els.filter.addEventListener("input", render);
+
+  // ---------- Export CSV ----------
+  function exportCsv() {
+    const list = visibleRows();
+    if (!list.length) return;
+    const header = ["Raison sociale", "Enseigne", "SIREN", "SIRET", "Code NAF", "Adresse", "Code postal", "Commune",
+      "Tranche effectif (code)", "Tranche effectif", "Année effectif", "Catégorie entreprise", "Date de création", "Fiche"];
+    const cell = (v) => { const s = String(v ?? ""); return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+    // SIREN/SIRET préfixés pour qu'Excel conserve les zéros de tête
+    const lines = list.map((r) => [r.name, r.enseigne, `="${r.siren}"`, `="${r.siret}"`, r.naf, r.adresse, r.cp, r.commune,
+      r.effCode, r.effLabel, r.effYear, r.categorie, r.creation, `https://annuaire-entreprises.data.gouv.fr/entreprise/${r.siren}`].map(cell).join(";"));
+    const csv = "﻿" + [header.map(cell).join(";"), ...lines].join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `leads-sirene-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  els.searchBtn.addEventListener("click", search);
+  els.exportBtn.addEventListener("click", exportCsv);
+  [els.naf, els.deps].forEach((i) => i.addEventListener("keydown", (e) => { if (e.key === "Enter") search(); }));
+})();
+</script>
+</body>
+</html>
